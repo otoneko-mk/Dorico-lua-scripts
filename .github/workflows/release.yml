@@ -1,0 +1,97 @@
+name: Release
+
+on:
+    push:
+        branches:
+            - main
+
+permissions:
+    contents: write
+
+concurrency:
+    group: dorico-lua-scripts-releases
+    queue: max
+
+jobs:
+    release:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Generate release version
+              id: version
+              shell: bash
+              run: |
+                  TODAY=$(TZ=Asia/Tokyo date +%Y.%m.%d)
+
+                  git fetch --tags --force
+
+                  LAST=$(git tag -l "${TODAY}.*" |
+                    awk -F. 'NF == 4 && $4 ~ /^[0-9][0-9]$/ {
+                      n = $4 + 0
+                      if (n > max) max = n
+                    } END { print max + 0 }')
+
+                  NEXT=$((LAST + 1))
+
+                  if (( NEXT > 99 )); then
+                    echo "Daily release limit exceeded."
+                    exit 1
+                  fi
+
+                  TAG=$(printf '%s.%02d' "$TODAY" "$NEXT")
+
+                  echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+            - name: Package Lua scripts
+              id: package
+              shell: bash
+              env:
+                  RELEASE_TAG: ${{ steps.version.outputs.tag }}
+              run: |
+                  mkdir -p release/scripts
+
+                  while IFS= read -r -d '' file; do
+                    name=$(basename "$file")
+
+                    if [[ -e "release/scripts/$name" ]]; then
+                      echo "Duplicate filename: $name"
+                      exit 1
+                    fi
+
+                    cp "$file" "release/scripts/$name"
+                  done < <(
+                    find lua-scripts -type f -name '*.lua' -print0
+                  )
+
+                  if ! compgen -G "release/scripts/*.lua" > /dev/null; then
+                    echo "No Lua scripts found."
+                    exit 1
+                  fi
+
+                  ZIP_NAME="dorico-lua-scripts_${RELEASE_TAG//./-}.zip"
+
+                  (
+                    cd release/scripts
+                    zip -q -9 "../$ZIP_NAME" ./*.lua
+                  )
+
+                  echo "zip_name=$ZIP_NAME" >> "$GITHUB_OUTPUT"
+
+            - name: Create GitHub Release
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  RELEASE_TAG: ${{ steps.version.outputs.tag }}
+                  ZIP_NAME: ${{ steps.package.outputs.zip_name }}
+              run: |
+                  gh release create \
+                    "$RELEASE_TAG" \
+                    "release/$ZIP_NAME" \
+                    --title "$RELEASE_TAG" \
+                    --target "$GITHUB_SHA" \
+                    --generate-notes \
+                    --latest

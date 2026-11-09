@@ -1,0 +1,5 @@
+local app=DoApp.DoApp()
+app:doCommand([[Edit.SelectMore]])
+app:doCommand([[Window.SwitchMode?WindowMode=kEngraveMode]])
+app:doCommand([[UI.InvokePropertyChangeValue?Type=kMultiRestBarCountDy&Value=string: "-3/2"]])
+app:doCommand([[Window.SwitchMode?WindowMode=kWriteMode]])

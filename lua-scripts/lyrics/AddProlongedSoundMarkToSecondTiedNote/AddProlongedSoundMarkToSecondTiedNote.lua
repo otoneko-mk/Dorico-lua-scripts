@@ -1,0 +1,8 @@
+local app=DoApp.DoApp()
+app:doCommand([[NoteInput.Scissor]])
+app:doCommand([[EventEdit.NavigateNextItemSamePosition]])
+app:doCommand([[NoteInput.StartLyricInput]])
+app:doCommand([[NoteInput.AcceptCurrentLyricInput?LyricText=ー&LyricsEntryAdvanceType=kEndInput]])
+app:doCommand([[EventEdit.NavigateNextItemSamePosition]])
+app:doCommand([[EventEdit.NavigateLeft]])
+app:doCommand([[NoteInput.Tie]])
